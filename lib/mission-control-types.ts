@@ -32,7 +32,23 @@ export type Activity = {
   createdAt: string;
 };
 
+export type PullRequestStatus = "OPEN" | "APPROVED" | "REJECTED";
+
+export type PullRequest = {
+  id: string;
+  taskId: string;
+  summary: string;
+  implementationDetails: string;
+  testingNotes: string;
+  status: PullRequestStatus;
+  qaDecisionReason: string | null;
+  reviewedBy: "QA" | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type MissionControlState = {
   tasks: Task[];
   activity: Activity[];
+  pullRequests: PullRequest[];
 };

@@ -188,7 +188,7 @@ const statusTone = {
 
 export default function HomePage() {
   const [activeView, setActiveView] = useState<ViewKey>("tasks");
-  const [taskState, setTaskState] = useState<MissionControlState>({ tasks: [], activity: [] });
+  const [taskState, setTaskState] = useState<MissionControlState>({ tasks: [], activity: [], pullRequests: [] });
   const [taskError, setTaskError] = useState<string | null>(null);
   const [taskLoading, setTaskLoading] = useState(true);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);

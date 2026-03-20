@@ -8,6 +8,8 @@ import {
   type Activity,
   type ActivityTone,
   type MissionControlState,
+  type PullRequest,
+  type PullRequestStatus,
   type Task,
   type TaskAssignee,
   type TaskPriority,
@@ -52,6 +54,18 @@ export type CreateActivityInput = {
   tone?: ActivityTone;
 };
 
+export type CreatePullRequestInput = {
+  taskId: string;
+  summary: string;
+  implementationDetails: string;
+  testingNotes: string;
+};
+
+export type ReviewPullRequestInput = {
+  decision: "APPROVE" | "REJECT";
+  reason?: string;
+};
+
 export async function deleteTask(taskId: string) {
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseAdmin();
@@ -69,6 +83,7 @@ export async function deleteTask(taskId: string) {
     const nextState: MissionControlState = {
       tasks: state.tasks.filter((task) => task.id !== taskId),
       activity: state.activity,
+      pullRequests: state.pullRequests ?? [],
     };
 
     if (nextState.tasks.length === state.tasks.length) {
@@ -101,6 +116,19 @@ type ActivityRow = {
   detail: string;
   tone: string;
   created_at: string;
+};
+
+type PullRequestRow = {
+  id: string;
+  task_id: string;
+  summary: string;
+  implementation_details: string;
+  testing_notes: string;
+  status: PullRequestStatus;
+  qa_decision_reason: string | null;
+  reviewed_by: "QA" | null;
+  created_at: string;
+  updated_at: string;
 };
 
 const dataFile = path.join(process.cwd(), "data", "mission-control.json");
@@ -337,29 +365,45 @@ function refreshDerivedFields(state: MissionControlState): MissionControlState {
         ...item,
         time: formatRelativeTime(item.createdAt),
       })),
+    pullRequests: state.pullRequests
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .map((pr) => ({
+        ...pr,
+        updatedAt: formatRelativeTime(pr.updatedAt),
+      })),
   };
 }
 
 export async function getMissionControlState() {
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseAdmin();
-    const [{ data: taskRows, error: taskError }, { data: activityRows, error: activityError }] =
-      await Promise.all([
-        supabase
-          .from("mission_control_tasks")
-          .select("*")
-          .order("updated_at", { ascending: false }),
-        supabase
-          .from("mission_control_activity")
-          .select("*")
-          .order("created_at", { ascending: false }),
-      ]);
+    const [
+      { data: taskRows, error: taskError },
+      { data: activityRows, error: activityError },
+      { data: pullRequestRows, error: pullRequestError },
+    ] = await Promise.all([
+      supabase
+        .from("mission_control_tasks")
+        .select("*")
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("mission_control_activity")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("mission_control_pull_requests")
+        .select("*")
+        .order("updated_at", { ascending: false }),
+    ]);
 
     if (taskError) {
       throw new Error(taskError.message);
     }
     if (activityError) {
       throw new Error(activityError.message);
+    }
+    if (pullRequestError) {
+      throw new Error(pullRequestError.message);
     }
 
     return refreshDerivedFields({
@@ -385,6 +429,18 @@ export async function getMissionControlState() {
         createdAt: row.created_at,
         time: formatRelativeTime(row.created_at),
       })),
+      pullRequests: ((pullRequestRows ?? []) as PullRequestRow[]).map((row) => ({
+        id: row.id,
+        taskId: row.task_id,
+        summary: row.summary,
+        implementationDetails: row.implementation_details,
+        testingNotes: row.testing_notes,
+        status: row.status,
+        qaDecisionReason: row.qa_decision_reason,
+        reviewedBy: row.reviewed_by,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
     });
   }
 
@@ -398,6 +454,7 @@ export async function getMissionControlState() {
       priority: normalizePriority(task.priority as string),
     })),
     activity: state.activity,
+    pullRequests: state.pullRequests ?? [],
   });
 }
 
@@ -481,6 +538,7 @@ export async function createTask(input: CreateTaskInput) {
     const nextState: MissionControlState = {
       tasks: [task, ...state.tasks],
       activity: state.activity,
+      pullRequests: state.pullRequests ?? [],
     };
 
     if (input.activity) {
@@ -612,7 +670,7 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
       activity = [createActivityRecord(state.activity, input.activity), ...state.activity];
     }
 
-    const nextState = { tasks, activity };
+    const nextState = { tasks, activity, pullRequests: state.pullRequests ?? [] };
     await writeState(nextState);
     return refreshDerivedFields(nextState);
   });
@@ -640,6 +698,171 @@ export async function createActivity(input: CreateActivityInput) {
     const state = await readState();
     const activity = [createActivityRecord(state.activity, input), ...state.activity];
     const nextState = { ...state, activity };
+    await writeState(nextState);
+    return refreshDerivedFields(nextState);
+  });
+}
+
+export async function createPullRequest(input: CreatePullRequestInput) {
+  const summary = requireText(input.summary, "PR summary");
+  const implementationDetails = requireText(input.implementationDetails, "PR implementationDetails");
+  const testingNotes = requireText(input.testingNotes, "PR testingNotes");
+
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseAdmin();
+    const { data: task, error: taskError } = await supabase
+      .from("mission_control_tasks")
+      .select("id,status")
+      .eq("id", input.taskId)
+      .maybeSingle();
+
+    if (taskError) throw new Error(taskError.message);
+    if (!task) throw new Error(`Task not found: ${input.taskId}`);
+    if (normalizeStatus(task.status) !== "IN_PROGRESS") {
+      throw new Error("PR can only be created when task is IN_PROGRESS");
+    }
+
+    const createdAt = nowIso();
+    const prId = createEntityId("A");
+    const { error: prError } = await supabase.from("mission_control_pull_requests").insert({
+      id: prId,
+      task_id: input.taskId,
+      summary,
+      implementation_details: implementationDetails,
+      testing_notes: testingNotes,
+      status: "OPEN",
+      qa_decision_reason: null,
+      reviewed_by: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    });
+    if (prError) throw new Error(prError.message);
+
+    const { error: taskUpdateError } = await supabase
+      .from("mission_control_tasks")
+      .update({ status: "PR_REVIEW", updated_at: nowIso() })
+      .eq("id", input.taskId);
+    if (taskUpdateError) throw new Error(taskUpdateError.message);
+
+    return getMissionControlState();
+  }
+
+  return withWriteLock(async () => {
+    const state = await readState();
+    const task = state.tasks.find((item) => item.id === input.taskId);
+    if (!task) throw new Error(`Task not found: ${input.taskId}`);
+    if (normalizeStatus(task.status as string) !== "IN_PROGRESS") {
+      throw new Error("PR can only be created when task is IN_PROGRESS");
+    }
+
+    const createdAt = nowIso();
+    const pr: PullRequest = {
+      id: createEntityId("A"),
+      taskId: input.taskId,
+      summary,
+      implementationDetails,
+      testingNotes,
+      status: "OPEN",
+      qaDecisionReason: null,
+      reviewedBy: null,
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    const nextState: MissionControlState = {
+      tasks: state.tasks.map((item) =>
+        item.id === input.taskId ? { ...item, status: "PR_REVIEW", updatedAt: nowIso() } : item,
+      ),
+      activity: state.activity,
+      pullRequests: [pr, ...(state.pullRequests ?? [])],
+    };
+
+    await writeState(nextState);
+    return refreshDerivedFields(nextState);
+  });
+}
+
+export async function reviewPullRequest(prId: string, input: ReviewPullRequestInput) {
+  const decisionStatus: PullRequestStatus = input.decision === "APPROVE" ? "APPROVED" : "REJECTED";
+  if (decisionStatus === "REJECTED" && !input.reason?.trim()) {
+    throw new Error("QA rejection reason is required");
+  }
+
+  if (isSupabaseConfigured()) {
+    const supabase = getSupabaseAdmin();
+    const { data: pr, error: prError } = await supabase
+      .from("mission_control_pull_requests")
+      .select("*")
+      .eq("id", prId)
+      .maybeSingle();
+    if (prError) throw new Error(prError.message);
+    if (!pr) throw new Error(`PR not found: ${prId}`);
+
+    const reason = input.reason?.trim() ?? null;
+    const { error: reviewError } = await supabase
+      .from("mission_control_pull_requests")
+      .update({
+        status: decisionStatus,
+        qa_decision_reason: reason,
+        reviewed_by: "QA",
+        updated_at: nowIso(),
+      })
+      .eq("id", prId);
+    if (reviewError) throw new Error(reviewError.message);
+
+    const taskStatus: TaskStatus = decisionStatus === "APPROVED" ? "DONE" : "FAILED";
+    const { error: taskError } = await supabase
+      .from("mission_control_tasks")
+      .update({
+        status: taskStatus,
+        review_failed_comment: decisionStatus === "REJECTED" ? reason : null,
+        review_failed_at: decisionStatus === "REJECTED" ? nowIso() : null,
+        updated_at: nowIso(),
+      })
+      .eq("id", pr.task_id);
+    if (taskError) throw new Error(taskError.message);
+
+    return getMissionControlState();
+  }
+
+  return withWriteLock(async () => {
+    const state = await readState();
+    const pullRequests = state.pullRequests ?? [];
+    const prIndex = pullRequests.findIndex((pr) => pr.id === prId);
+    if (prIndex === -1) throw new Error(`PR not found: ${prId}`);
+
+    const reason = input.reason?.trim() ?? null;
+    const current = pullRequests[prIndex];
+    const nextPR: PullRequest = {
+      ...current,
+      status: decisionStatus,
+      qaDecisionReason: reason,
+      reviewedBy: "QA",
+      updatedAt: nowIso(),
+    };
+
+    const updatedPRs = [...pullRequests];
+    updatedPRs[prIndex] = nextPR;
+
+    const nextTaskStatus: TaskStatus = decisionStatus === "APPROVED" ? "DONE" : "FAILED";
+    const nextTasks = state.tasks.map((task) =>
+      task.id === current.taskId
+        ? {
+            ...task,
+            status: nextTaskStatus,
+            reviewFailedComment: decisionStatus === "REJECTED" ? reason : null,
+            reviewFailedAt: decisionStatus === "REJECTED" ? nowIso() : null,
+            updatedAt: nowIso(),
+          }
+        : task,
+    );
+
+    const nextState: MissionControlState = {
+      tasks: nextTasks,
+      activity: state.activity,
+      pullRequests: updatedPRs,
+    };
+
     await writeState(nextState);
     return refreshDerivedFields(nextState);
   });
@@ -691,29 +914,6 @@ const seedState: MissionControlState = {
       createdAt: "2026-03-19T10:18:00.000Z",
       time: "now",
     },
-    {
-      id: "A-003",
-      agent: "Scout",
-      detail: "Collected three overnight signals for the morning market scan cron.",
-      tone: "watch",
-      createdAt: "2026-03-19T10:14:00.000Z",
-      time: "4 min ago",
-    },
-    {
-      id: "A-002",
-      agent: "Charlie",
-      detail: "Delivered a first-pass component inventory for the office scene.",
-      tone: "complete",
-      createdAt: "2026-03-19T10:01:00.000Z",
-      time: "17 min ago",
-    },
-    {
-      id: "A-001",
-      agent: "Violet",
-      detail: "Tagged March 18 memory clusters into product, ops, and personal threads.",
-      tone: "watch",
-      createdAt: "2026-03-19T09:49:00.000Z",
-      time: "29 min ago",
-    },
   ],
+  pullRequests: [],
 };
