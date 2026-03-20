@@ -1,0 +1,12 @@
+.next/
+node_modules/
+
+.env.local
+.env*.local
+
+.DS_Store
+
+*.log
+npm-debug.log*
+
+.idea/

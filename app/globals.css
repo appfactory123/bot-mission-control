@@ -1,0 +1,747 @@
+:root {
+  --bg: #0c0d10;
+  --bg-soft: #15171c;
+  --panel: rgba(17, 19, 24, 0.92);
+  --panel-strong: rgba(20, 22, 28, 0.98);
+  --panel-muted: rgba(24, 26, 33, 0.98);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --text: #f3f4f6;
+  --muted: #9ba3af;
+  --teal: #69d2b0;
+  --blue: #7c9cff;
+  --amber: #d8a54b;
+  --rose: #d97792;
+  --grid: rgba(255, 255, 255, 0.03);
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.24);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  background: linear-gradient(180deg, #0b0d10 0%, #111318 100%);
+  font-family: var(--font-display), sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.shell {
+  position: relative;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  min-height: 100vh;
+  padding: 18px;
+  gap: 18px;
+}
+
+.shell__backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent 95%);
+}
+
+.sidebar,
+.panel,
+.topbar,
+.metric {
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+}
+
+.sidebar {
+  position: sticky;
+  top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: calc(100vh - 36px);
+  padding: 18px 14px;
+  border-radius: 18px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand__mark,
+.avatar,
+.office-agent__sprite {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: #0b1118;
+  font-weight: 700;
+  background: linear-gradient(135deg, #e5e7eb, #9ca3af);
+}
+
+.brand h1,
+.topbar h2,
+.panel h3,
+.task-card h4,
+.project-card h4,
+.memory-card h4,
+.doc-card h4,
+.team-card h4,
+.schedule-card h4 {
+  margin: 0;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nav {
+  display: grid;
+  gap: 8px;
+}
+
+.nav__item,
+.ghost-button,
+.primary-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: 180ms ease;
+}
+
+.nav__item {
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+}
+
+.nav__item:hover,
+.ghost-button:hover {
+  border-color: var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav__item--active {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.nav__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+}
+
+.mission-card {
+  margin-top: auto;
+  padding: 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel-muted);
+}
+
+.mission-card p:last-child,
+.task-card p,
+.activity-item p,
+.note,
+.memory-card p,
+.doc-card p,
+.project-card p,
+.schedule-card__meta span,
+.team-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.main-panel {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 18px;
+  border-radius: 16px;
+}
+
+.topbar__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ghost-button {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ghost-button--danger {
+  color: #f2c3cf;
+  border-color: rgba(217, 119, 146, 0.18);
+  background: rgba(217, 119, 146, 0.08);
+}
+
+.primary-button {
+  color: #f8fafc;
+  border-color: rgba(124, 156, 255, 0.26);
+  background: linear-gradient(180deg, #3d5af1, #3346b0);
+}
+
+.stats-grid,
+.content-grid,
+.project-grid,
+.docs-list,
+.team-list,
+.calendar-list,
+.memory-list {
+  display: grid;
+  gap: 16px;
+}
+
+.stats-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metric {
+  padding: 16px;
+  border-radius: 16px;
+  background: var(--panel-muted);
+}
+
+.metric strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1.5rem;
+}
+
+.metric span {
+  color: var(--muted);
+}
+
+.metric--teal strong {
+  color: var(--teal);
+}
+
+.metric--blue strong {
+  color: var(--blue);
+}
+
+.metric--amber strong {
+  color: var(--amber);
+}
+
+.metric--rose strong {
+  color: var(--rose);
+}
+
+.content-grid--tasks {
+  grid-template-columns: minmax(0, 1.9fr) 280px;
+}
+
+.content-grid--calendar,
+.content-grid--memory,
+.content-grid--team,
+.content-grid--office {
+  grid-template-columns: minmax(0, 1.35fr) 280px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 18px;
+  border-radius: 16px;
+}
+
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.pill-row,
+.task-card__meta,
+.doc-card__meta,
+.schedule-card__meta,
+.progress,
+.team-card {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pill,
+.status,
+.priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+}
+
+.pill {
+  border: 1px solid var(--panel-border);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.api-callout {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(124, 156, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(124, 156, 255, 0.06);
+}
+
+.error-text {
+  margin: 0 0 16px;
+  color: #ff98b1;
+}
+
+.task-form,
+.field,
+.modal-actions {
+  display: grid;
+}
+
+.task-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  width: min(680px, calc(100vw - 32px));
+  padding: 0;
+  border: none;
+  background: transparent;
+  transform: translate(-50%, -50%);
+}
+
+.task-dialog::backdrop {
+  background: rgba(4, 7, 17, 0.74);
+  backdrop-filter: blur(14px);
+}
+
+.task-dialog__surface {
+  padding: 22px;
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: rgba(17, 19, 24, 0.98);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.task-form {
+  gap: 16px;
+}
+
+.field {
+  gap: 8px;
+}
+
+.field span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.modal-actions {
+  grid-auto-flow: column;
+  justify-content: end;
+  gap: 10px;
+}
+
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.kanban__column {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.kanban__title {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.78rem;
+}
+
+.task-card,
+.activity-item,
+.schedule-card,
+.project-card,
+.memory-card,
+.doc-card,
+.team-card {
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: var(--panel-muted);
+}
+
+.task-card,
+.schedule-card,
+.project-card,
+.memory-card,
+.doc-card {
+  padding: 14px;
+}
+
+.task-card__topline,
+.activity-item__title,
+.doc-card__header,
+.project-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.task-card__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  gap: 8px;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: 160ms ease;
+}
+
+.icon-button:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.icon-button span {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.72rem;
+}
+
+.icon-button--danger {
+  color: #f2c3cf;
+  border-color: rgba(217, 119, 146, 0.16);
+  background: rgba(217, 119, 146, 0.08);
+}
+
+.review-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(217, 119, 146, 0.14);
+  border-radius: 10px;
+  background: rgba(217, 119, 146, 0.08);
+}
+
+.review-note strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.84rem;
+}
+
+.review-note p {
+  margin: 0;
+  color: var(--text);
+}
+
+.priority--critical {
+  color: #ffdce6;
+  background: rgba(217, 119, 146, 0.18);
+}
+
+.priority--high {
+  color: #f7dfb1;
+  background: rgba(216, 165, 75, 0.18);
+}
+
+.priority--medium {
+  color: #d3f7ed;
+  background: rgba(105, 210, 176, 0.18);
+}
+
+.activity-feed,
+.stack {
+  display: grid;
+  gap: 12px;
+}
+
+.activity-item {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+}
+
+.signal {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  margin-top: 4px;
+}
+
+.signal--active {
+  background: var(--teal);
+  box-shadow: 0 0 0 4px rgba(105, 210, 176, 0.12);
+}
+
+.signal--complete {
+  background: var(--blue);
+}
+
+.signal--watch {
+  background: var(--amber);
+}
+
+.status--queued {
+  color: #f7dfb1;
+  background: rgba(216, 165, 75, 0.16);
+}
+
+.status--running {
+  color: #d3f7ed;
+  background: rgba(105, 210, 176, 0.16);
+}
+
+.status--healthy {
+  color: #dce4ff;
+  background: rgba(124, 156, 255, 0.16);
+}
+
+.project-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.progress__bar {
+  position: relative;
+  flex: 1;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progress__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--blue), var(--teal));
+}
+
+.memory-card ul {
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.docs-list,
+.calendar-list,
+.memory-list,
+.team-list {
+  grid-auto-rows: min-content;
+}
+
+.team-card {
+  display: grid;
+  grid-template-columns: 46px 1.2fr 1fr 1fr auto;
+  padding: 14px;
+}
+
+.office {
+  position: relative;
+  min-height: 520px;
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top, rgba(124, 156, 255, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01)),
+    #111318;
+}
+
+.office__grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.office-agent {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  transform: translate(-50%, -50%);
+}
+
+.office-agent__sprite {
+  width: 54px;
+  height: 54px;
+  border-radius: 18px;
+}
+
+.office-agent__label {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(8, 12, 24, 0.84);
+}
+
+.office-agent__label span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.office__zone {
+  position: absolute;
+  padding: 12px 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  color: var(--muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.office__zone--desk {
+  left: 6%;
+  top: 8%;
+}
+
+.office__zone--build {
+  left: 34%;
+  top: 44%;
+}
+
+.office__zone--research {
+  left: 61%;
+  top: 14%;
+}
+
+.office__zone--ops {
+  left: 68%;
+  top: 62%;
+}
+
+@media (max-width: 1200px) {
+  .stats-grid,
+  .project-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .content-grid--tasks,
+  .content-grid--calendar,
+  .content-grid--memory,
+  .content-grid--team,
+  .content-grid--office {
+    grid-template-columns: 1fr;
+  }
+
+  .team-card {
+    grid-template-columns: 46px 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+  }
+
+  .stats-grid,
+  .project-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

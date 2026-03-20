@@ -1,0 +1,141 @@
+{
+  "tasks": [
+    {
+      "id": "T-20",
+      "title": "asdfasdf",
+      "description": "asdfasdfasdf",
+      "assignee": "henry",
+      "project": "Mission Control",
+      "status": "Backlog",
+      "priority": "Medium",
+      "createdAt": "2026-03-20T02:34:05.827Z",
+      "updatedAt": "2026-03-20T02:34:05.827Z"
+    },
+    {
+      "id": "T-19",
+      "title": "test",
+      "description": "132",
+      "assignee": "henry",
+      "project": "Mission Control",
+      "status": "Backlog",
+      "priority": "Medium",
+      "createdAt": "2026-03-20T02:31:41.482Z",
+      "updatedAt": "2026-03-20T02:31:41.482Z"
+    },
+    {
+      "id": "T-18",
+      "title": "Build multi-agent mission control shell",
+      "description": "Stand up the dashboard shell, information architecture, and visual language.",
+      "assignee": "henry",
+      "project": "Mission Control",
+      "status": "In Progress",
+      "priority": "Critical",
+      "reviewFailedComment": null,
+      "reviewFailedAt": null,
+      "createdAt": "2026-03-19T10:10:00.000Z",
+      "updatedAt": "2026-03-19T10:18:00.000Z"
+    },
+    {
+      "id": "T-12",
+      "title": "Schedule morning market scan",
+      "description": "Create a 7:30 daily heartbeat that briefs overnight signals and open items.",
+      "assignee": "scout",
+      "project": "Operator Loop",
+      "status": "Recurring",
+      "priority": "High",
+      "reviewFailedComment": null,
+      "reviewFailedAt": null,
+      "createdAt": "2026-03-19T10:00:00.000Z",
+      "updatedAt": "2026-03-19T10:08:00.000Z"
+    },
+    {
+      "id": "T-09",
+      "title": "Review newsletter draft",
+      "description": "Turn the AI-produced first draft into a publication-ready issue.",
+      "assignee": "henry",
+      "project": "Content Engine",
+      "status": "Review",
+      "priority": "Medium",
+      "reviewFailedComment": null,
+      "reviewFailedAt": null,
+      "createdAt": "2026-03-19T09:46:00.000Z",
+      "updatedAt": "2026-03-19T10:02:00.000Z"
+    },
+    {
+      "id": "T-07",
+      "title": "Map long-term memory schema",
+      "description": "Normalize daily journals, facts, and strategic notes for retrieval.",
+      "assignee": "violet",
+      "project": "Memory Core",
+      "status": "Backlog",
+      "priority": "High",
+      "reviewFailedComment": null,
+      "reviewFailedAt": null,
+      "createdAt": "2026-03-19T09:15:00.000Z",
+      "updatedAt": "2026-03-19T09:49:00.000Z"
+    },
+    {
+      "id": "T-03",
+      "title": "Draft office visualization states",
+      "description": "Define idle, focus, sync, and cooldown behaviors for each worker tile.",
+      "assignee": "charlie",
+      "project": "Mission Control",
+      "status": "Done",
+      "priority": "Medium",
+      "reviewFailedComment": null,
+      "reviewFailedAt": null,
+      "createdAt": "2026-03-19T08:40:00.000Z",
+      "updatedAt": "2026-03-19T09:22:00.000Z"
+    }
+  ],
+  "activity": [
+    {
+      "id": "A-006",
+      "agent": "Henry",
+      "detail": "Created task \"asdfasdf\" from mission control.",
+      "tone": "active",
+      "createdAt": "2026-03-20T02:34:05.827Z",
+      "time": "now"
+    },
+    {
+      "id": "A-005",
+      "agent": "Henry",
+      "detail": "Created task \"test\" from mission control.",
+      "tone": "active",
+      "createdAt": "2026-03-20T02:31:41.482Z",
+      "time": "now"
+    },
+    {
+      "id": "A-004",
+      "agent": "Henry",
+      "detail": "Syncing task board with backlog assignments and escalating critical blockers.",
+      "tone": "active",
+      "createdAt": "2026-03-19T10:18:00.000Z",
+      "time": "now"
+    },
+    {
+      "id": "A-003",
+      "agent": "Scout",
+      "detail": "Collected three overnight signals for the morning market scan cron.",
+      "tone": "watch",
+      "createdAt": "2026-03-19T10:14:00.000Z",
+      "time": "4 min ago"
+    },
+    {
+      "id": "A-002",
+      "agent": "Charlie",
+      "detail": "Delivered a first-pass component inventory for the office scene.",
+      "tone": "complete",
+      "createdAt": "2026-03-19T10:01:00.000Z",
+      "time": "17 min ago"
+    },
+    {
+      "id": "A-001",
+      "agent": "Violet",
+      "detail": "Tagged March 18 memory clusters into product, ops, and personal threads.",
+      "tone": "watch",
+      "createdAt": "2026-03-19T09:49:00.000Z",
+      "time": "29 min ago"
+    }
+  ]
+}
