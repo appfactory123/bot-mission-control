@@ -69,10 +69,39 @@ export type ReviewPullRequestInput = {
 export async function deleteTask(taskId: string) {
   if (isSupabaseConfigured()) {
     const supabase = getSupabaseAdmin();
+    const { data: existing, error: existingError } = await supabase
+      .from("mission_control_tasks")
+      .select("id,title")
+      .eq("id", taskId)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(existingError.message);
+    }
+    if (!existing) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+
     const { error } = await supabase.from("mission_control_tasks").delete().eq("id", taskId);
 
     if (error) {
       throw new Error(error.message);
+    }
+
+    const activityInput = createSupabaseActivityInsert({
+      agent: "System",
+      detail: `Task deleted (${existing.id}): ${existing.title}`,
+      tone: "watch",
+    });
+    const { error: activityError } = await supabase.from("mission_control_activity").insert({
+      id: activityInput.id,
+      agent: activityInput.agent,
+      detail: activityInput.detail,
+      tone: activityInput.tone,
+      created_at: activityInput.created_at,
+    });
+    if (activityError) {
+      throw new Error(activityError.message);
     }
 
     return getMissionControlState();
@@ -80,15 +109,25 @@ export async function deleteTask(taskId: string) {
 
   return withWriteLock(async () => {
     const state = await readState();
+    const deleted = state.tasks.find((task) => task.id === taskId);
     const nextState: MissionControlState = {
       tasks: state.tasks.filter((task) => task.id !== taskId),
       activity: state.activity,
       pullRequests: state.pullRequests ?? [],
     };
 
-    if (nextState.tasks.length === state.tasks.length) {
+    if (nextState.tasks.length === state.tasks.length || !deleted) {
       throw new Error(`Task not found: ${taskId}`);
     }
+
+    nextState.activity = [
+      createActivityRecord(state.activity, {
+        agent: "System",
+        detail: `Task deleted (${deleted.id}): ${deleted.title}`,
+        tone: "watch",
+      }),
+      ...state.activity,
+    ];
 
     await writeState(nextState);
     return refreshDerivedFields(nextState);
@@ -295,6 +334,23 @@ function assertStatusTransition(current: TaskStatus, next: TaskStatus) {
   }
 }
 
+function buildTaskUpdateActivityDetail(existing: Task, next: Task, commentChanged: boolean) {
+  const changes: string[] = [];
+
+  if (existing.status !== next.status) changes.push(`status ${existing.status} -> ${next.status}`);
+  if (existing.priority !== next.priority) changes.push(`priority ${existing.priority} -> ${next.priority}`);
+  if (existing.assignee !== next.assignee) changes.push(`assignee ${existing.assignee} -> ${next.assignee}`);
+  if (existing.title !== next.title) changes.push("title updated");
+  if (existing.description !== next.description) changes.push("description updated");
+  if (commentChanged) changes.push("comment updated");
+
+  if (changes.length === 0) {
+    return `Task updated: ${next.title}`;
+  }
+
+  return `Task updated (${next.id}): ${changes.join(", ")}`;
+}
+
 function createActivityRecord(activity: Activity[], input: CreateActivityInput): Activity {
   const tone = input.tone ?? "active";
   assertTone(tone);
@@ -490,19 +546,23 @@ export async function createTask(input: CreateTaskInput) {
       throw new Error(error.message);
     }
 
-    if (input.activity) {
-      const activityInput = createSupabaseActivityInsert(input.activity);
-      const { error: activityError } = await supabase.from("mission_control_activity").insert({
-        id: activityInput.id,
-        agent: activityInput.agent,
-        detail: activityInput.detail,
-        tone: activityInput.tone,
-        created_at: activityInput.created_at,
-      });
+    const activityInput = createSupabaseActivityInsert(
+      input.activity ?? {
+        agent: "System",
+        detail: `Task created (${title}) assigned to ${assignee}`,
+        tone: "active",
+      },
+    );
+    const { error: activityError } = await supabase.from("mission_control_activity").insert({
+      id: activityInput.id,
+      agent: activityInput.agent,
+      detail: activityInput.detail,
+      tone: activityInput.tone,
+      created_at: activityInput.created_at,
+    });
 
-      if (activityError) {
-        throw new Error(activityError.message);
-      }
+    if (activityError) {
+      throw new Error(activityError.message);
     }
 
     return getMissionControlState();
@@ -541,9 +601,17 @@ export async function createTask(input: CreateTaskInput) {
       pullRequests: state.pullRequests ?? [],
     };
 
-    if (input.activity) {
-      nextState.activity = [createActivityRecord(state.activity, input.activity), ...state.activity];
-    }
+    nextState.activity = [
+      createActivityRecord(
+        state.activity,
+        input.activity ?? {
+          agent: "System",
+          detail: `Task created (${task.id}) assigned to ${task.assignee}`,
+          tone: "active",
+        },
+      ),
+      ...state.activity,
+    ];
 
     await writeState(nextState);
     return refreshDerivedFields(nextState);
@@ -604,19 +672,68 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
       throw new Error(error.message);
     }
 
-    if (input.activity) {
-      const activityInput = createSupabaseActivityInsert(input.activity);
-      const { error: activityError } = await supabase.from("mission_control_activity").insert({
-        id: activityInput.id,
-        agent: activityInput.agent,
-        detail: activityInput.detail,
-        tone: activityInput.tone,
-        created_at: activityInput.created_at,
-      });
+    const nextTaskForActivity: Task = {
+      id: existing.id,
+      title: input.title?.trim() ?? existing.title,
+      description: input.description?.trim() ?? existing.description,
+      acceptanceCriteria:
+        input.acceptanceCriteria !== undefined
+          ? requireAcceptanceCriteria(input.acceptanceCriteria)
+          : existing.acceptance_criteria ?? [],
+      assignee: input.assignee ? requireAssignee(input.assignee, "Task assignee") : normalizeAssignee(existing.assignee),
+      project: input.project?.trim() ?? existing.project,
+      status,
+      priority,
+      reviewFailedComment:
+        input.reviewFailedComment !== undefined
+          ? normalizeOptionalText(input.reviewFailedComment)
+          : existing.review_failed_comment,
+      reviewFailedAt:
+        input.reviewFailedComment !== undefined
+          ? normalizeOptionalText(input.reviewFailedComment)
+            ? nowIso()
+            : null
+          : existing.review_failed_at,
+      createdAt: existing.created_at,
+      updatedAt: nowIso(),
+    };
 
-      if (activityError) {
-        throw new Error(activityError.message);
-      }
+    const existingTaskForActivity: Task = {
+      id: existing.id,
+      title: existing.title,
+      description: existing.description,
+      acceptanceCriteria: existing.acceptance_criteria ?? [],
+      assignee: normalizeAssignee(existing.assignee),
+      project: existing.project,
+      status: currentStatus,
+      priority: normalizePriority(existing.priority),
+      reviewFailedComment: existing.review_failed_comment,
+      reviewFailedAt: existing.review_failed_at,
+      createdAt: existing.created_at,
+      updatedAt: existing.updated_at,
+    };
+
+    const commentChanged =
+      input.reviewFailedComment !== undefined &&
+      normalizeOptionalText(input.reviewFailedComment) !== existing.review_failed_comment;
+
+    const activityInput = createSupabaseActivityInsert(
+      input.activity ?? {
+        agent: "System",
+        detail: buildTaskUpdateActivityDetail(existingTaskForActivity, nextTaskForActivity, commentChanged),
+        tone: commentChanged || existingTaskForActivity.status !== nextTaskForActivity.status ? "watch" : "active",
+      },
+    );
+    const { error: activityError } = await supabase.from("mission_control_activity").insert({
+      id: activityInput.id,
+      agent: activityInput.agent,
+      detail: activityInput.detail,
+      tone: activityInput.tone,
+      created_at: activityInput.created_at,
+    });
+
+    if (activityError) {
+      throw new Error(activityError.message);
     }
 
     return getMissionControlState();
@@ -665,10 +782,21 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
     const tasks = [...state.tasks];
     tasks[taskIndex] = updatedTask;
 
-    let activity = state.activity;
-    if (input.activity) {
-      activity = [createActivityRecord(state.activity, input.activity), ...state.activity];
-    }
+    const commentChanged =
+      input.reviewFailedComment !== undefined &&
+      normalizeOptionalText(input.reviewFailedComment) !== existing.reviewFailedComment;
+
+    const activity = [
+      createActivityRecord(
+        state.activity,
+        input.activity ?? {
+          agent: "System",
+          detail: buildTaskUpdateActivityDetail(existing, updatedTask, commentChanged),
+          tone: commentChanged || existing.status !== updatedTask.status ? "watch" : "active",
+        },
+      ),
+      ...state.activity,
+    ];
 
     const nextState = { tasks, activity, pullRequests: state.pullRequests ?? [] };
     await writeState(nextState);
