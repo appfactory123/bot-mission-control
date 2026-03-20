@@ -2,21 +2,23 @@ import path from "node:path";
 import { promises as fs } from "node:fs";
 import {
   activityTones,
+  taskAssignees,
   taskPriorities,
   taskStatuses,
   type Activity,
   type ActivityTone,
   type MissionControlState,
   type Task,
+  type TaskAssignee,
   type TaskPriority,
   type TaskStatus,
 } from "./mission-control-types";
-import { isBotId, type BotId } from "./bots";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase-admin";
 
 export type CreateTaskInput = {
   title: string;
   description?: string;
+  acceptanceCriteria?: string[];
   assignee: string;
   project: string;
   status?: TaskStatus;
@@ -31,6 +33,7 @@ export type CreateTaskInput = {
 export type UpdateTaskInput = {
   title?: string;
   description?: string;
+  acceptanceCriteria?: string[];
   assignee?: string;
   project?: string;
   status?: TaskStatus;
@@ -81,6 +84,7 @@ type TaskRow = {
   id: string;
   title: string;
   description: string;
+  acceptance_criteria?: string[] | null;
   assignee: string;
   project: string;
   status: string;
@@ -128,14 +132,30 @@ function requireText(value: unknown, fieldName: string) {
   return value.trim();
 }
 
-function requireBotId(value: unknown, fieldName: string): BotId {
-  const botId = requireText(value, fieldName);
+function requireAssignee(value: unknown, fieldName: string): TaskAssignee {
+  const assignee = requireText(value, fieldName);
 
-  if (!isBotId(botId)) {
-    throw new Error(`${fieldName} must be a valid bot id`);
+  if (!taskAssignees.includes(assignee as TaskAssignee)) {
+    throw new Error(`${fieldName} must be Developer or QA`);
   }
 
-  return botId;
+  return assignee as TaskAssignee;
+}
+
+function requireAcceptanceCriteria(value: unknown) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error("acceptanceCriteria is required and must be a non-empty array");
+  }
+
+  const cleaned = value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+
+  if (cleaned.length === 0) {
+    throw new Error("acceptanceCriteria must contain at least one non-empty item");
+  }
+
+  return cleaned;
 }
 
 function normalizeOptionalText(value: unknown) {
@@ -231,6 +251,22 @@ function assertTone(tone: string): asserts tone is ActivityTone {
   }
 }
 
+function assertStatusTransition(current: TaskStatus, next: TaskStatus) {
+  if (current === next) return;
+
+  const allowed: Record<TaskStatus, TaskStatus[]> = {
+    TODO: ["IN_PROGRESS"],
+    IN_PROGRESS: ["PR_REVIEW"],
+    PR_REVIEW: ["DONE", "FAILED"],
+    DONE: [],
+    FAILED: ["IN_PROGRESS"],
+  };
+
+  if (!allowed[current].includes(next)) {
+    throw new Error(`Invalid status transition: ${current} -> ${next}`);
+  }
+}
+
 function createActivityRecord(activity: Activity[], input: CreateActivityInput): Activity {
   const tone = input.tone ?? "active";
   assertTone(tone);
@@ -257,6 +293,34 @@ function createSupabaseActivityInsert(input: CreateActivityInput) {
     tone,
     created_at: nowIso(),
   };
+}
+
+function normalizeStatus(value: string): TaskStatus {
+  const mapped: Record<string, TaskStatus> = {
+    Backlog: "TODO",
+    "In Progress": "IN_PROGRESS",
+    Review: "PR_REVIEW",
+    Done: "DONE",
+    Recurring: "TODO",
+    Failed: "FAILED",
+  };
+  const candidate = (mapped[value] ?? value) as TaskStatus;
+  assertStatus(candidate);
+  return candidate;
+}
+
+function normalizePriority(value: string): TaskPriority {
+  const mapped: Record<string, TaskPriority> = { Critical: "HIGH", High: "HIGH", Medium: "MEDIUM", Low: "LOW" };
+  const candidate = (mapped[value] ?? value) as TaskPriority;
+  assertPriority(candidate);
+  return candidate;
+}
+
+function normalizeAssignee(value: string): TaskAssignee {
+  if (taskAssignees.includes(value as TaskAssignee)) {
+    return value as TaskAssignee;
+  }
+  return "Developer";
 }
 
 function refreshDerivedFields(state: MissionControlState): MissionControlState {
@@ -303,10 +367,11 @@ export async function getMissionControlState() {
         id: row.id,
         title: row.title,
         description: row.description,
-        assignee: row.assignee as BotId,
+        acceptanceCriteria: row.acceptance_criteria ?? [],
+        assignee: normalizeAssignee(row.assignee),
         project: row.project,
-        status: row.status as TaskStatus,
-        priority: row.priority as TaskPriority,
+        status: normalizeStatus(row.status),
+        priority: normalizePriority(row.priority),
         reviewFailedComment: row.review_failed_comment,
         reviewFailedAt: row.review_failed_at,
         createdAt: row.created_at,
@@ -324,18 +389,28 @@ export async function getMissionControlState() {
   }
 
   const state = await readState();
-  return refreshDerivedFields(state);
+  return refreshDerivedFields({
+    tasks: state.tasks.map((task) => ({
+      ...task,
+      acceptanceCriteria: task.acceptanceCriteria ?? [],
+      assignee: normalizeAssignee(task.assignee as string),
+      status: normalizeStatus(task.status as string),
+      priority: normalizePriority(task.priority as string),
+    })),
+    activity: state.activity,
+  });
 }
 
 export async function createTask(input: CreateTaskInput) {
   if (isSupabaseConfigured()) {
-    const status = input.status ?? "Backlog";
-    const priority = input.priority ?? "Medium";
+    const status = input.status ?? "TODO";
+    const priority = input.priority ?? "MEDIUM";
     assertStatus(status);
     assertPriority(priority);
     const title = requireText(input.title, "Task title");
-    const assignee = requireBotId(input.assignee, "Task assignee");
+    const assignee = requireAssignee(input.assignee, "Task assignee");
     const project = requireText(input.project, "Task project");
+    const acceptanceCriteria = requireAcceptanceCriteria(input.acceptanceCriteria);
     const supabase = getSupabaseAdmin();
     const createdAt = nowIso();
 
@@ -343,6 +418,7 @@ export async function createTask(input: CreateTaskInput) {
       id: createEntityId("T"),
       title,
       description: input.description?.trim() ?? "",
+      acceptance_criteria: acceptanceCriteria,
       assignee,
       project,
       status,
@@ -377,19 +453,21 @@ export async function createTask(input: CreateTaskInput) {
 
   return withWriteLock(async () => {
     const state = await readState();
-    const status = input.status ?? "Backlog";
-    const priority = input.priority ?? "Medium";
+    const status = input.status ?? "TODO";
+    const priority = input.priority ?? "MEDIUM";
     assertStatus(status);
     assertPriority(priority);
     const title = requireText(input.title, "Task title");
-    const assignee = requireBotId(input.assignee, "Task assignee");
+    const assignee = requireAssignee(input.assignee, "Task assignee");
     const project = requireText(input.project, "Task project");
+    const acceptanceCriteria = requireAcceptanceCriteria(input.acceptanceCriteria);
 
     const createdAt = nowIso();
     const task: Task = {
       id: nextTaskId(state.tasks),
       title,
       description: input.description?.trim() ?? "",
+      acceptanceCriteria,
       assignee,
       project,
       status,
@@ -430,17 +508,23 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
       throw new Error(`Task not found: ${taskId}`);
     }
 
-    const status = input.status ?? existing.status;
-    const priority = input.priority ?? existing.priority;
+    const currentStatus = normalizeStatus(existing.status);
+    const status = (input.status ?? currentStatus) as TaskStatus;
+    const priority = (input.priority ?? normalizePriority(existing.priority)) as TaskPriority;
     assertStatus(status);
     assertPriority(priority);
+    assertStatusTransition(currentStatus, status);
 
     const { error } = await supabase
       .from("mission_control_tasks")
       .update({
         title: input.title?.trim() ?? existing.title,
         description: input.description?.trim() ?? existing.description,
-        assignee: input.assignee ? requireBotId(input.assignee, "Task assignee") : existing.assignee,
+        acceptance_criteria:
+          input.acceptanceCriteria !== undefined
+            ? requireAcceptanceCriteria(input.acceptanceCriteria)
+            : existing.acceptance_criteria ?? [],
+        assignee: input.assignee ? requireAssignee(input.assignee, "Task assignee") : normalizeAssignee(existing.assignee),
         project: input.project?.trim() ?? existing.project,
         status,
         priority,
@@ -493,12 +577,17 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
     const priority = input.priority ?? existing.priority;
     assertStatus(status);
     assertPriority(priority);
+    assertStatusTransition(existing.status, status);
 
     const updatedTask: Task = {
       ...existing,
       title: input.title?.trim() ?? existing.title,
       description: input.description?.trim() ?? existing.description,
-      assignee: input.assignee ? requireBotId(input.assignee, "Task assignee") : existing.assignee,
+      acceptanceCriteria:
+        input.acceptanceCriteria !== undefined
+          ? requireAcceptanceCriteria(input.acceptanceCriteria)
+          : existing.acceptanceCriteria,
+      assignee: input.assignee ? requireAssignee(input.assignee, "Task assignee") : existing.assignee,
       project: input.project?.trim() ?? existing.project,
       status,
       priority,
@@ -559,69 +648,38 @@ export async function createActivity(input: CreateActivityInput) {
 const seedState: MissionControlState = {
   tasks: [
     {
-      id: "T-18",
-      title: "Build multi-agent mission control shell",
-      description: "Stand up the dashboard shell, information architecture, and visual language.",
-      assignee: "henry",
+      id: "T-01",
+      title: "Implement strict task lifecycle",
+      description: "Enforce TODO > IN_PROGRESS > PR_REVIEW > DONE/FAILED with validation.",
+      acceptanceCriteria: [
+        "Invalid status transitions are rejected",
+        "Only Developer/QA assignee is accepted",
+      ],
+      assignee: "Developer",
       project: "Mission Control",
-      status: "In Progress",
-      priority: "Critical",
+      status: "IN_PROGRESS",
+      priority: "HIGH",
       reviewFailedComment: null,
       reviewFailedAt: null,
-      createdAt: "2026-03-19T10:10:00.000Z",
-      updatedAt: "2026-03-19T10:18:00.000Z",
+      createdAt: "2026-03-20T03:00:00.000Z",
+      updatedAt: "2026-03-20T03:10:00.000Z",
     },
     {
-      id: "T-12",
-      title: "Schedule morning market scan",
-      description: "Create a 7:30 daily heartbeat that briefs overnight signals and open items.",
-      assignee: "scout",
-      project: "Operator Loop",
-      status: "Recurring",
-      priority: "High",
-      reviewFailedComment: null,
-      reviewFailedAt: null,
-      createdAt: "2026-03-19T10:00:00.000Z",
-      updatedAt: "2026-03-19T10:08:00.000Z",
-    },
-    {
-      id: "T-09",
-      title: "Review newsletter draft",
-      description: "Turn the AI-produced first draft into a publication-ready issue.",
-      assignee: "henry",
-      project: "Content Engine",
-      status: "Review",
-      priority: "Medium",
-      reviewFailedComment: null,
-      reviewFailedAt: null,
-      createdAt: "2026-03-19T09:46:00.000Z",
-      updatedAt: "2026-03-19T10:02:00.000Z",
-    },
-    {
-      id: "T-07",
-      title: "Map long-term memory schema",
-      description: "Normalize daily journals, facts, and strategic notes for retrieval.",
-      assignee: "violet",
-      project: "Memory Core",
-      status: "Backlog",
-      priority: "High",
-      reviewFailedComment: null,
-      reviewFailedAt: null,
-      createdAt: "2026-03-19T09:15:00.000Z",
-      updatedAt: "2026-03-19T09:49:00.000Z",
-    },
-    {
-      id: "T-03",
-      title: "Draft office visualization states",
-      description: "Define idle, focus, sync, and cooldown behaviors for each worker tile.",
-      assignee: "charlie",
+      id: "T-02",
+      title: "QA review checklist",
+      description: "Define approval/rejection quality gates for PR_REVIEW tasks.",
+      acceptanceCriteria: [
+        "Reject requires clear reasoning",
+        "Approve marks task DONE",
+      ],
+      assignee: "QA",
       project: "Mission Control",
-      status: "Done",
-      priority: "Medium",
+      status: "TODO",
+      priority: "MEDIUM",
       reviewFailedComment: null,
       reviewFailedAt: null,
-      createdAt: "2026-03-19T08:40:00.000Z",
-      updatedAt: "2026-03-19T09:22:00.000Z",
+      createdAt: "2026-03-20T03:11:00.000Z",
+      updatedAt: "2026-03-20T03:11:00.000Z",
     },
   ],
   activity: [

@@ -1,11 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { bots, getBotById, type BotId } from "../lib/bots";
+import { bots } from "../lib/bots";
 import {
+  taskAssignees,
   taskPriorities,
   taskStatuses,
   type MissionControlState,
+  type TaskAssignee,
   type TaskPriority,
   type TaskStatus,
 } from "../lib/mission-control-types";
@@ -200,10 +202,11 @@ export default function HomePage() {
   const [taskForm, setTaskForm] = useState({
     title: "",
     description: "",
-    assignee: bots[0].id as BotId,
+    acceptanceCriteria: "",
+    assignee: "Developer" as TaskAssignee,
     project: "Mission Control",
-    status: "Backlog" as TaskStatus,
-    priority: "Medium" as TaskPriority,
+    status: "TODO" as TaskStatus,
+    priority: "MEDIUM" as TaskPriority,
   });
 
   useEffect(() => {
@@ -246,8 +249,8 @@ export default function HomePage() {
     };
   }, []);
 
-  const inProgressCount = taskState.tasks.filter((task) => task.status === "In Progress").length;
-  const completedCount = taskState.tasks.filter((task) => task.status === "Done").length;
+  const inProgressCount = taskState.tasks.filter((task) => task.status === "IN_PROGRESS").length;
+  const completedCount = taskState.tasks.filter((task) => task.status === "DONE").length;
 
   async function handleSubmitTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -262,15 +265,19 @@ export default function HomePage() {
         },
         body: JSON.stringify({
           ...taskForm,
+          acceptanceCriteria: taskForm.acceptanceCriteria
+            .split("\n")
+            .map((item) => item.trim())
+            .filter(Boolean),
           reviewFailedComment: null,
           activity: isEditing
             ? {
-                agent: getBotById(taskForm.assignee)?.name ?? taskForm.assignee,
+                agent: taskForm.assignee,
                 detail: `Updated task "${taskForm.title}" from mission control.`,
                 tone: "active",
               }
             : {
-                agent: getBotById(taskForm.assignee)?.name ?? taskForm.assignee,
+                agent: taskForm.assignee,
                 detail: `Created task "${taskForm.title}" from mission control.`,
                 tone: "active",
               },
@@ -290,10 +297,11 @@ export default function HomePage() {
       setTaskForm({
         title: "",
         description: "",
-        assignee: bots[0].id,
+        acceptanceCriteria: "",
+        assignee: "Developer",
         project: "Mission Control",
-        status: "Backlog",
-        priority: "Medium",
+        status: "TODO",
+        priority: "MEDIUM",
       });
       setActiveView("tasks");
     } catch (error) {
@@ -347,7 +355,7 @@ export default function HomePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          status: "Backlog",
+          status: "FAILED",
           reviewFailedComment: reviewFailureComment,
           activity: {
             agent: "Alex",
@@ -456,6 +464,7 @@ export default function HomePage() {
               setTaskForm({
                 title: task.title,
                 description: task.description,
+                acceptanceCriteria: (task.acceptanceCriteria ?? []).join("\n"),
                 assignee: task.assignee,
                 project: task.project,
                 status: task.status,
@@ -515,18 +524,31 @@ export default function HomePage() {
                 />
               </label>
 
+              <label className="field">
+                <span>Acceptance Criteria (one per line)</span>
+                <textarea
+                  value={taskForm.acceptanceCriteria}
+                  onChange={(event) =>
+                    setTaskForm((current) => ({ ...current, acceptanceCriteria: event.target.value }))
+                  }
+                  placeholder="Given X...\nWhen Y...\nThen Z..."
+                  rows={4}
+                  required
+                />
+              </label>
+
               <div className="field-grid">
                 <label className="field">
                   <span>Assignee</span>
                   <select
                     value={taskForm.assignee}
                     onChange={(event) =>
-                      setTaskForm((current) => ({ ...current, assignee: event.target.value as BotId }))
+                      setTaskForm((current) => ({ ...current, assignee: event.target.value as TaskAssignee }))
                     }
                   >
-                    {bots.map((bot) => (
-                      <option key={bot.id} value={bot.id}>
-                        {bot.name}
+                    {taskAssignees.map((assignee) => (
+                      <option key={assignee} value={assignee}>
+                        {assignee}
                       </option>
                     ))}
                   </select>
@@ -774,6 +796,13 @@ function TasksView({
                     </div>
                     <h4>{task.title}</h4>
                     <p>{task.description}</p>
+                    {task.acceptanceCriteria?.length ? (
+                      <ul>
+                        {task.acceptanceCriteria.slice(0, 2).map((criterion) => (
+                          <li key={criterion} className="note">• {criterion}</li>
+                        ))}
+                      </ul>
+                    ) : null}
                     {task.reviewFailedComment && (
                       <div className="review-note">
                         <strong>Review failed</strong>
@@ -781,11 +810,11 @@ function TasksView({
                       </div>
                     )}
                     <div className="task-card__meta">
-                      <span>{getBotById(task.assignee)?.name ?? task.assignee}</span>
+                      <span>{task.assignee}</span>
                       <span>{task.project}</span>
                       <span>{task.updatedAt}</span>
                     </div>
-                    {task.status === "Review" && (
+                    {task.status === "PR_REVIEW" && (
                       <div className="task-card__actions">
                         <button className="icon-button" type="button" onClick={() => onEditTask(task)} aria-label="Edit task">
                           <span aria-hidden="true">E</span>
@@ -808,7 +837,7 @@ function TasksView({
                         </button>
                       </div>
                     )}
-                    {task.status !== "Review" && (
+                    {task.status !== "PR_REVIEW" && (
                       <div className="task-card__actions">
                         <button className="icon-button" type="button" onClick={() => onEditTask(task)} aria-label="Edit task">
                           <span aria-hidden="true">E</span>
