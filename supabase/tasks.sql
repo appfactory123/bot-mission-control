@@ -50,3 +50,27 @@ create index if not exists mission_control_pull_requests_updated_at_idx
 
 alter table public.mission_control_tasks
   add column if not exists acceptance_criteria text[] default '{}'::text[];
+
+create table if not exists public.mission_control_daily_memory (
+  date date primary key,
+  focus_areas text[] not null default '{}'::text[],
+  summary text not null default '',
+  token_usage_estimated_total integer not null default 0,
+  token_usage_activity_events integer not null default 0,
+  token_usage_tasks_tracked integer not null default 0,
+  token_usage_pull_requests_tracked integer not null default 0,
+  highlights text[] not null default '{}'::text[],
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.mission_control_long_term_memory (
+  id text primary key,
+  mission_statement text not null,
+  team_roles text[] not null default '{}'::text[],
+  project_context text[] not null default '{}'::text[],
+  unresolved_questions text[] not null default '{}'::text[],
+  principles text[] not null default '{}'::text[],
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
