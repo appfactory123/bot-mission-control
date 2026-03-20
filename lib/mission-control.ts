@@ -16,6 +16,7 @@ import {
   type TaskStatus,
 } from "./mission-control-types";
 import { getSupabaseAdmin, isSupabaseConfigured } from "./supabase-admin";
+import { syncMissionMemoryFromDatabase } from "./memory-sync";
 
 export type CreateTaskInput = {
   title: string;
@@ -104,6 +105,7 @@ export async function deleteTask(taskId: string) {
       throw new Error(activityError.message);
     }
 
+    await safeSyncMemory();
     return getMissionControlState();
   }
 
@@ -351,6 +353,15 @@ function buildTaskUpdateActivityDetail(existing: Task, next: Task, commentChange
   return `Task updated (${next.id}): ${changes.join(", ")}`;
 }
 
+async function safeSyncMemory() {
+  if (!isSupabaseConfigured()) return;
+  try {
+    await syncMissionMemoryFromDatabase();
+  } catch (error) {
+    console.error("[memory-sync]", error);
+  }
+}
+
 function createActivityRecord(activity: Activity[], input: CreateActivityInput): Activity {
   const tone = input.tone ?? "active";
   assertTone(tone);
@@ -565,6 +576,7 @@ export async function createTask(input: CreateTaskInput) {
       throw new Error(activityError.message);
     }
 
+    await safeSyncMemory();
     return getMissionControlState();
   }
 
@@ -736,6 +748,7 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
       throw new Error(activityError.message);
     }
 
+    await safeSyncMemory();
     return getMissionControlState();
   }
 
@@ -819,6 +832,7 @@ export async function createActivity(input: CreateActivityInput) {
       throw new Error(error.message);
     }
 
+    await safeSyncMemory();
     return getMissionControlState();
   }
 
@@ -872,6 +886,7 @@ export async function createPullRequest(input: CreatePullRequestInput) {
       .eq("id", input.taskId);
     if (taskUpdateError) throw new Error(taskUpdateError.message);
 
+    await safeSyncMemory();
     return getMissionControlState();
   }
 
@@ -950,6 +965,7 @@ export async function reviewPullRequest(prId: string, input: ReviewPullRequestIn
       .eq("id", pr.task_id);
     if (taskError) throw new Error(taskError.message);
 
+    await safeSyncMemory();
     return getMissionControlState();
   }
 
