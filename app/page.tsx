@@ -43,10 +43,26 @@ type Project = {
   nextAction: string;
 };
 
-type MemoryDay = {
-  day: string;
-  summary: string;
-  memories: string[];
+type MemoryApiResponse = {
+  daily: {
+    date: string;
+    focusAreas: string[];
+    summary: string;
+    tokenUsage: {
+      estimatedTotal: number;
+      activityEvents: number;
+      tasksTracked: number;
+      pullRequestsTracked: number;
+    };
+    highlights: string[];
+  };
+  longTerm: {
+    missionStatement: string;
+    teamRoles: string[];
+    projectContext: string[];
+    unresolvedQuestions: string[];
+    principles: string[];
+  };
 };
 
 type DocItem = {
@@ -125,26 +141,6 @@ const projects: Project[] = [
   },
 ];
 
-const memoryDays: MemoryDay[] = [
-  {
-    day: "March 19, 2026",
-    summary: "Focused on turning mission control from a transcript into a working system.",
-    memories: [
-      "Need one source of truth for tasks, docs, memory, and schedules.",
-      "The UI should feel operational, not like a generic admin panel.",
-      "Office view matters because visibility changes trust in autonomous work.",
-    ],
-  },
-  {
-    day: "March 18, 2026",
-    summary: "Refined the core agent roles and where each model should be used.",
-    memories: [
-      "Charlie owns engineering and prototype delivery.",
-      "Violet handles research and memory grooming.",
-      "Scout should remain lightweight and proactive for daily scans.",
-    ],
-  },
-];
 
 const documents: DocItem[] = [
   {
@@ -208,6 +204,8 @@ export default function HomePage() {
     status: "TODO" as TaskStatus,
     priority: "MEDIUM" as TaskPriority,
   });
+  const [memoryData, setMemoryData] = useState<MemoryApiResponse | null>(null);
+  const [memoryError, setMemoryError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -246,6 +244,34 @@ export default function HomePage() {
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMemory() {
+      try {
+        const response = await fetch("/api/memory", { cache: "no-store" });
+        if (!response.ok) throw new Error(`Memory API returned ${response.status}`);
+        const data = (await response.json()) as MemoryApiResponse;
+        if (!cancelled) {
+          setMemoryData(data);
+          setMemoryError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setMemoryError(error instanceof Error ? error.message : "Failed to load memory");
+        }
+      }
+    }
+
+    void loadMemory();
+    const id = window.setInterval(() => void loadMemory(), 15000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
     };
   }, []);
 
@@ -477,7 +503,7 @@ export default function HomePage() {
         )}
         {activeView === "calendar" && <CalendarView />}
         {activeView === "projects" && <ProjectsView />}
-        {activeView === "memory" && <MemoryView />}
+        {activeView === "memory" && <MemoryView memoryData={memoryData} memoryError={memoryError} />}
         {activeView === "docs" && <DocsView />}
         {activeView === "team" && <TeamView />}
         {activeView === "office" && <OfficeView />}
@@ -970,43 +996,91 @@ function ProjectsView() {
   );
 }
 
-function MemoryView() {
+function MemoryView({
+  memoryData,
+  memoryError,
+}: {
+  memoryData: MemoryApiResponse | null;
+  memoryError: string | null;
+}) {
   return (
     <div className="content-grid content-grid--memory">
       <section className="panel">
         <div className="panel__header">
           <div>
             <p className="eyebrow">Daily memory</p>
-            <h3>Recall by day</h3>
+            <h3>Team focus and usage today</h3>
           </div>
         </div>
-        <div className="memory-list">
-          {memoryDays.map((day) => (
-            <article key={day.day} className="memory-card">
-              <h4>{day.day}</h4>
-              <p>{day.summary}</p>
+
+        {memoryError && <p className="error-text">{memoryError}</p>}
+
+        {memoryData ? (
+          <div className="memory-list">
+            <article className="memory-card">
+              <h4>{memoryData.daily.date}</h4>
+              <p>{memoryData.daily.summary}</p>
               <ul>
-                {day.memories.map((memory) => (
-                  <li key={memory}>{memory}</li>
-                ))}
+                <li>Focus areas: {memoryData.daily.focusAreas.join(", ") || "No focus areas yet"}</li>
+                <li>Estimated token usage: {memoryData.daily.tokenUsage.estimatedTotal}</li>
+                <li>Tasks tracked: {memoryData.daily.tokenUsage.tasksTracked}</li>
+                <li>Activity events: {memoryData.daily.tokenUsage.activityEvents}</li>
+                <li>PRs tracked: {memoryData.daily.tokenUsage.pullRequestsTracked}</li>
+              </ul>
+              <p className="note">Highlights:</p>
+              <ul>
+                {memoryData.daily.highlights.length > 0 ? (
+                  memoryData.daily.highlights.map((item) => <li key={item}>{item}</li>)
+                ) : (
+                  <li>No highlights yet for today.</li>
+                )}
               </ul>
             </article>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <p className="note">Loading daily memory...</p>
+        )}
       </section>
 
       <section className="panel">
         <div className="panel__header">
           <div>
             <p className="eyebrow">Long-term memory</p>
-            <h3>Durable truths</h3>
+            <h3>Durable context</h3>
           </div>
         </div>
-        <div className="stack">
-          <p className="note">Mission control should centralize retrieval, not leave memory buried in markdown files.</p>
-          <p className="note">Useful long-term memories: mission statement, team roles, project context, and unresolved questions.</p>
-          <p className="note">Good memory UX makes prior conversations usable like a journal instead of dead chat history.</p>
-        </div>
+
+        {memoryData ? (
+          <div className="stack">
+            <p className="note"><strong>Mission:</strong> {memoryData.longTerm.missionStatement}</p>
+            <p className="note"><strong>Principles:</strong></p>
+            <ul>
+              {memoryData.longTerm.principles.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <p className="note"><strong>Team roles:</strong></p>
+            <ul>
+              {memoryData.longTerm.teamRoles.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <p className="note"><strong>Project context:</strong></p>
+            <ul>
+              {memoryData.longTerm.projectContext.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+            <p className="note"><strong>Unresolved questions:</strong></p>
+            <ul>
+              {memoryData.longTerm.unresolvedQuestions.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="note">Loading long-term memory...</p>
+        )}
       </section>
     </div>
   );
