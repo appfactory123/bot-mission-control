@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
-import { AppShell } from "../components/app-shell";
 import "./globals.css";
 
 const display = Space_Grotesk({
@@ -26,9 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${display.variable} ${mono.variable}`}>
-        <AppShell>{children}</AppShell>
-      </body>
+      <body className={`${display.variable} ${mono.variable}`}>{children}</body>
     </html>
   );
 }
