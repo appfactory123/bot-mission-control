@@ -14,8 +14,8 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mission Control",
-  description: "Control surface for autonomous agents, schedules, memory, and documents.",
+  title: "Projects/AIHQ Mission Control",
+  description: "Operator dashboard for directing Projects/AIHQ teams, automations, memory, and outputs.",
 };
 
 export default function RootLayout({
