@@ -84,7 +84,7 @@ const navItems: NavItem[] = [
 ];
 
 const missionStatement =
-  "Direct Projects/AIHQ execution by assigning work, tracking agent health, and keeping delivery visible across teams.";
+  "Build an autonomous organization of AI agents that turns ideas into deployed systems, documented decisions, and proactive execution.";
 
 const scheduledEvents: Event[] = [
   {
@@ -416,8 +416,8 @@ export default function HomePage() {
         <div className="brand">
           <div className="brand__mark">MC</div>
           <div>
-            <p className="eyebrow">Projects/AIHQ Mission Control</p>
-            <h1>Team Operations Deck</h1>
+            <p className="eyebrow">Mission Control</p>
+            <h1>Operator Deck</h1>
           </div>
         </div>
 
@@ -470,10 +470,10 @@ export default function HomePage() {
         </header>
 
         <section className="stats-grid">
-          <MetricCard label="Tasks closed" value={String(completedCount)} detail="delivery lane" accent="teal" />
-          <MetricCard label="In progress" value={String(inProgressCount)} detail="execution lane" accent="blue" />
+          <MetricCard label="Tasks closed" value={String(completedCount)} detail="done column" accent="teal" />
+          <MetricCard label="In progress" value={String(inProgressCount)} detail="actively moving" accent="blue" />
           <MetricCard label="Scheduled automations" value="12" detail="next run 07:30" accent="amber" />
-          <MetricCard label="Live agents" value={String(new Set(taskState.activity.map((item) => item.agent)).size || 4)} detail="operator heartbeat" accent="rose" />
+          <MetricCard label="Live agents" value={String(new Set(taskState.activity.map((item) => item.agent)).size || 4)} detail="heartbeat feed" accent="rose" />
         </section>
 
         {activeView === "tasks" && (
@@ -743,7 +743,7 @@ export default function HomePage() {
 }
 
 function labelFor(view: ViewKey) {
-  return navItems.find((item) => item.key === view)?.label ?? "Projects/AIHQ Mission Control";
+  return navItems.find((item) => item.key === view)?.label ?? "Mission Control";
 }
 
 function MetricCard({
