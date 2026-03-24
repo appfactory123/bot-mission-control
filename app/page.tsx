@@ -1,12 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import { bots } from "../lib/bots";
 import {
   taskAssignees,
   taskPriorities,
   taskStatuses,
   type MissionControlState,
+  type Task,
   type TaskAssignee,
   type TaskPriority,
   type TaskStatus,
@@ -195,6 +196,7 @@ export default function HomePage() {
   const [reviewFailureTaskId, setReviewFailureTaskId] = useState<string | null>(null);
   const [reviewFailureComment, setReviewFailureComment] = useState("");
   const [isSubmittingReviewFailure, setIsSubmittingReviewFailure] = useState(false);
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<Task | null>(null);
   const [taskForm, setTaskForm] = useState({
     title: "",
     description: "",
@@ -499,6 +501,7 @@ export default function HomePage() {
               setIsTaskModalOpen(true);
             }}
             onDeleteTask={(taskId) => setDeletingTaskId(taskId)}
+            onOpenTaskDetail={(task) => setSelectedTaskDetail(task)}
           />
         )}
         {activeView === "calendar" && <CalendarView />}
@@ -738,6 +741,54 @@ export default function HomePage() {
         </dialog>
       )}
 
+      {selectedTaskDetail && (
+        <dialog className="task-dialog" open aria-modal="true">
+          <div className="task-dialog__surface">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Task details</p>
+                <h3>{selectedTaskDetail.title}</h3>
+              </div>
+              <button className="ghost-button" type="button" onClick={() => setSelectedTaskDetail(null)}>
+                Close
+              </button>
+            </div>
+
+            <div className="task-detail">
+              <div className="pill-row">
+                <span className={`priority priority--${selectedTaskDetail.priority.toLowerCase()}`}>{selectedTaskDetail.priority}</span>
+                <span className="pill">{selectedTaskDetail.status}</span>
+                <span className="pill">{selectedTaskDetail.assignee}</span>
+                <span className="pill">{selectedTaskDetail.project}</span>
+              </div>
+
+              <section className="stack">
+                <p className="eyebrow">Description</p>
+                <div className="task-markdown">{renderMarkdown(selectedTaskDetail.description || "No description.")}</div>
+              </section>
+
+              {selectedTaskDetail.acceptanceCriteria?.length ? (
+                <section className="stack">
+                  <p className="eyebrow">Acceptance criteria</p>
+                  <ul>
+                    {selectedTaskDetail.acceptanceCriteria.map((criterion) => (
+                      <li key={criterion}>{criterion}</li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
+              {selectedTaskDetail.reviewFailedComment ? (
+                <section className="review-note">
+                  <strong>Review failed</strong>
+                  <p>{selectedTaskDetail.reviewFailedComment}</p>
+                </section>
+              ) : null}
+            </div>
+          </div>
+        </dialog>
+      )}
+
     </main>
   );
 }
@@ -773,6 +824,7 @@ function TasksView({
   onFailReview,
   onEditTask,
   onDeleteTask,
+  onOpenTaskDetail,
 }: {
   taskState: MissionControlState;
   loading: boolean;
@@ -780,6 +832,7 @@ function TasksView({
   onFailReview: (taskId: string, comment: string) => void;
   onEditTask: (task: MissionControlState["tasks"][number]) => void;
   onDeleteTask: (taskId: string) => void;
+  onOpenTaskDetail: (task: Task) => void;
 }) {
   return (
     <div className="content-grid content-grid--tasks">
@@ -815,13 +868,18 @@ function TasksView({
               {taskState.tasks
                 .filter((task) => task.status === column)
                 .map((task) => (
-                  <article key={task.id} className="task-card">
+                  <article key={task.id} className="task-card" role="button" tabIndex={0} onClick={() => onOpenTaskDetail(task)} onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onOpenTaskDetail(task);
+                    }
+                  }}>
                     <div className="task-card__topline">
                       <span className={`priority priority--${task.priority.toLowerCase()}`}>{task.priority}</span>
                       <span>{task.id}</span>
                     </div>
                     <h4>{task.title}</h4>
-                    <p>{task.description}</p>
+                    <div className="task-markdown task-markdown--preview">{renderMarkdown(shortenDescription(task.description, 180))}</div>
                     {task.acceptanceCriteria?.length ? (
                       <ul>
                         {task.acceptanceCriteria.slice(0, 2).map((criterion) => (
@@ -842,13 +900,19 @@ function TasksView({
                     </div>
                     {task.status === "PR_REVIEW" && (
                       <div className="task-card__actions">
-                        <button className="icon-button" type="button" onClick={() => onEditTask(task)} aria-label="Edit task">
+                        <button className="icon-button" type="button" onClick={(event) => {
+                          event.stopPropagation();
+                          onEditTask(task);
+                        }} aria-label="Edit task">
                           <span aria-hidden="true">E</span>
                         </button>
                         <button
                           className="icon-button icon-button--danger"
                           type="button"
-                          onClick={() => onFailReview(task.id, task.reviewFailedComment ?? "")}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onFailReview(task.id, task.reviewFailedComment ?? "");
+                          }}
                           aria-label="Fail review"
                         >
                           <span aria-hidden="true">R</span>
@@ -856,7 +920,10 @@ function TasksView({
                         <button
                           className="icon-button icon-button--danger"
                           type="button"
-                          onClick={() => onDeleteTask(task.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDeleteTask(task.id);
+                          }}
                           aria-label="Delete task"
                         >
                           <span aria-hidden="true">D</span>
@@ -865,13 +932,19 @@ function TasksView({
                     )}
                     {task.status !== "PR_REVIEW" && (
                       <div className="task-card__actions">
-                        <button className="icon-button" type="button" onClick={() => onEditTask(task)} aria-label="Edit task">
+                        <button className="icon-button" type="button" onClick={(event) => {
+                          event.stopPropagation();
+                          onEditTask(task);
+                        }} aria-label="Edit task">
                           <span aria-hidden="true">E</span>
                         </button>
                         <button
                           className="icon-button icon-button--danger"
                           type="button"
-                          onClick={() => onDeleteTask(task.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDeleteTask(task.id);
+                          }}
                           aria-label="Delete task"
                         >
                           <span aria-hidden="true">D</span>
@@ -909,6 +982,106 @@ function TasksView({
       </section>
     </div>
   );
+}
+
+function shortenDescription(markdown: string, maxLength = 160) {
+  const plain = markdown
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/[>#*_~\-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (plain.length <= maxLength) return markdown;
+  return `${plain.slice(0, maxLength).trimEnd()}…`;
+}
+
+function renderMarkdown(markdown: string): ReactNode {
+  const normalized = markdown.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return <p className="note">No description.</p>;
+
+  const lines = normalized.split("\n");
+  const blocks: ReactNode[] = [];
+  let listItems: string[] = [];
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    blocks.push(
+      <ul key={`list-${blocks.length}`}>
+        {listItems.map((item, index) => (
+          <li key={`${item}-${index}`}>{renderInlineMarkdown(item)}</li>
+        ))}
+      </ul>,
+    );
+    listItems = [];
+  };
+
+  lines.forEach((line, index) => {
+    const listMatch = line.match(/^\s*[-*]\s+(.*)$/);
+    if (listMatch) {
+      listItems.push(listMatch[1]);
+      return;
+    }
+
+    flushList();
+
+    if (!line.trim()) {
+      return;
+    }
+
+    blocks.push(
+      <p key={`p-${index}`}>{renderInlineMarkdown(line)}</p>,
+    );
+  });
+
+  flushList();
+
+  return <>{blocks}</>;
+}
+
+function renderInlineMarkdown(text: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^\)]+\)|\*[^*]+\*)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(text.slice(lastIndex, match.index));
+    }
+
+    const token = match[0];
+
+    if (token.startsWith("**") && token.endsWith("**")) {
+      nodes.push(<strong key={`b-${match.index}`}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith("*") && token.endsWith("*")) {
+      nodes.push(<em key={`i-${match.index}`}>{token.slice(1, -1)}</em>);
+    } else if (token.startsWith("`") && token.endsWith("`")) {
+      nodes.push(<code key={`c-${match.index}`}>{token.slice(1, -1)}</code>);
+    } else if (token.startsWith("[")) {
+      const linkMatch = token.match(/^\[([^\]]+)\]\(([^\)]+)\)$/);
+      if (linkMatch) {
+        nodes.push(
+          <a key={`a-${match.index}`} href={linkMatch[2]} target="_blank" rel="noreferrer noopener">
+            {linkMatch[1]}
+          </a>,
+        );
+      } else {
+        nodes.push(token);
+      }
+    } else {
+      nodes.push(token);
+    }
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex));
+  }
+
+  return nodes;
 }
 
 function CalendarView() {

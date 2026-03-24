@@ -454,6 +454,19 @@ button {
   padding: 14px;
 }
 
+.task-card {
+  cursor: pointer;
+}
+
+.task-card:hover {
+  border-color: rgba(124, 156, 255, 0.28);
+}
+
+.task-card:focus-visible {
+  outline: 2px solid rgba(124, 156, 255, 0.6);
+  outline-offset: 2px;
+}
+
 .task-card__topline,
 .activity-item__title,
 .doc-card__header,
@@ -507,6 +520,51 @@ button {
   border: 1px solid rgba(217, 119, 146, 0.14);
   border-radius: 10px;
   background: rgba(217, 119, 146, 0.08);
+}
+
+.task-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.task-markdown {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.task-markdown p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.task-markdown ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.task-markdown li {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.task-markdown code {
+  padding: 1px 6px;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: #dce4ff;
+  background: rgba(124, 156, 255, 0.12);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.84em;
+}
+
+.task-markdown a {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
+.task-markdown--preview {
+  margin-bottom: 6px;
 }
 
 .review-note strong {
