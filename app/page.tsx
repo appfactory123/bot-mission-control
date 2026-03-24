@@ -991,6 +991,7 @@ function TasksView({
 function formatTaskStatus(status: TaskStatus) {
   const labels: Record<TaskStatus, string> = {
     BACKLOG: "Backlog",
+    TODO: "To Do",
     IN_PROGRESS: "In Progress",
     PR_REVIEW: "In Review",
     DONE: "Done",

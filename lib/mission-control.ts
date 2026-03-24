@@ -336,7 +336,8 @@ function assertStatusTransition(current: TaskStatus, next: TaskStatus) {
   if (current === next) return;
 
   const allowed: Record<TaskStatus, TaskStatus[]> = {
-    BACKLOG: ["IN_PROGRESS"],
+    BACKLOG: ["TODO"],
+    TODO: ["IN_PROGRESS"],
     IN_PROGRESS: ["PR_REVIEW"],
     PR_REVIEW: ["DONE", "FAILED"],
     DONE: [],
@@ -405,7 +406,8 @@ function createSupabaseActivityInsert(input: CreateActivityInput) {
 function normalizeStatus(value: string): TaskStatus {
   const mapped: Record<string, TaskStatus> = {
     Backlog: "BACKLOG",
-    TODO: "BACKLOG",
+    TODO: "TODO",
+    "To Do": "TODO",
     "In Progress": "IN_PROGRESS",
     Review: "PR_REVIEW",
     Done: "DONE",
