@@ -18,6 +18,9 @@ alter table public.mission_control_tasks
 alter table public.mission_control_tasks
   add column if not exists review_failed_at timestamptz;
 
+alter table public.mission_control_tasks
+  add column if not exists tag text;
+
 create table if not exists public.mission_control_activity (
   id text primary key,
   agent text not null,

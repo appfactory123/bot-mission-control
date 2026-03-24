@@ -326,6 +326,12 @@ button {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.pill--tag {
+  color: #ffdce6;
+  border-color: rgba(217, 119, 146, 0.24);
+  background: rgba(217, 119, 146, 0.12);
+}
+
 .api-callout {
   margin-bottom: 16px;
   padding: 12px 14px;

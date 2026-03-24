@@ -145,6 +145,7 @@ type TaskRow = {
   project: string;
   status: string;
   priority: string;
+  tag: string | null;
   review_failed_comment: string | null;
   review_failed_at: string | null;
   created_at: string;
@@ -234,6 +235,17 @@ function normalizeOptionalText(value: unknown) {
 
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function getReviewFailedCount(tag: string | null | undefined) {
+  const match = (tag ?? "").match(/^review_failed\s*\((\d+)\)$/i);
+  if (!match) return 0;
+  return Number(match[1]) || 0;
+}
+
+function nextReviewFailedTag(currentTag: string | null | undefined) {
+  const next = getReviewFailedCount(currentTag) + 1;
+  return `review_failed (${next})`;
 }
 
 async function ensureStore() {
@@ -483,6 +495,7 @@ export async function getMissionControlState() {
         project: row.project,
         status: normalizeStatus(row.status),
         priority: normalizePriority(row.priority),
+        tag: row.tag ?? null,
         reviewFailedComment: row.review_failed_comment,
         reviewFailedAt: row.review_failed_at,
         createdAt: row.created_at,
@@ -519,6 +532,7 @@ export async function getMissionControlState() {
       assignee: normalizeAssignee(task.assignee as string),
       status: normalizeStatus(task.status as string),
       priority: normalizePriority(task.priority as string),
+      tag: task.tag ?? null,
     })),
     activity: state.activity,
     pullRequests: state.pullRequests ?? [],
@@ -547,6 +561,7 @@ export async function createTask(input: CreateTaskInput) {
       project,
       status,
       priority,
+      tag: null,
       review_failed_comment: null,
       review_failed_at: null,
       created_at: createdAt,
@@ -601,6 +616,7 @@ export async function createTask(input: CreateTaskInput) {
       project,
       status,
       priority,
+      tag: null,
       reviewFailedComment: null,
       reviewFailedAt: null,
       createdAt,
@@ -647,11 +663,33 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
     }
 
     const currentStatus = normalizeStatus(existing.status);
-    const status = (input.status ?? currentStatus) as TaskStatus;
+    const requestedStatus = (input.status ?? currentStatus) as TaskStatus;
     const priority = (input.priority ?? normalizePriority(existing.priority)) as TaskPriority;
-    assertStatus(status);
+    assertStatus(requestedStatus);
     assertPriority(priority);
+
+    const shouldReturnToInProgress = currentStatus === "PR_REVIEW" && requestedStatus === "FAILED";
+    const status: TaskStatus = shouldReturnToInProgress ? "IN_PROGRESS" : requestedStatus;
     assertStatusTransition(currentStatus, status);
+
+    const normalizedFailedComment =
+      input.reviewFailedComment !== undefined
+        ? normalizeOptionalText(input.reviewFailedComment)
+        : existing.review_failed_comment;
+
+    const nextTag = shouldReturnToInProgress
+      ? nextReviewFailedTag(existing.tag)
+      : input.status === "DONE"
+        ? null
+        : existing.tag;
+
+    const reviewFailedAt = shouldReturnToInProgress
+      ? nowIso()
+      : input.reviewFailedComment !== undefined
+        ? normalizedFailedComment
+          ? nowIso()
+          : null
+        : existing.review_failed_at;
 
     const { error } = await supabase
       .from("mission_control_tasks")
@@ -666,16 +704,9 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
         project: input.project?.trim() ?? existing.project,
         status,
         priority,
-        review_failed_comment:
-          input.reviewFailedComment !== undefined
-            ? normalizeOptionalText(input.reviewFailedComment)
-            : existing.review_failed_comment,
-        review_failed_at:
-          input.reviewFailedComment !== undefined
-            ? normalizeOptionalText(input.reviewFailedComment)
-              ? nowIso()
-              : null
-            : existing.review_failed_at,
+        tag: nextTag,
+        review_failed_comment: normalizedFailedComment,
+        review_failed_at: reviewFailedAt,
         updated_at: nowIso(),
       })
       .eq("id", taskId);
@@ -696,16 +727,9 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
       project: input.project?.trim() ?? existing.project,
       status,
       priority,
-      reviewFailedComment:
-        input.reviewFailedComment !== undefined
-          ? normalizeOptionalText(input.reviewFailedComment)
-          : existing.review_failed_comment,
-      reviewFailedAt:
-        input.reviewFailedComment !== undefined
-          ? normalizeOptionalText(input.reviewFailedComment)
-            ? nowIso()
-            : null
-          : existing.review_failed_at,
+      tag: nextTag,
+      reviewFailedComment: normalizedFailedComment,
+      reviewFailedAt: reviewFailedAt,
       createdAt: existing.created_at,
       updatedAt: nowIso(),
     };
@@ -719,6 +743,7 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
       project: existing.project,
       status: currentStatus,
       priority: normalizePriority(existing.priority),
+      tag: existing.tag ?? null,
       reviewFailedComment: existing.review_failed_comment,
       reviewFailedAt: existing.review_failed_at,
       createdAt: existing.created_at,
@@ -761,11 +786,33 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
     }
 
     const existing = state.tasks[taskIndex];
-    const status = input.status ?? existing.status;
+    const requestedStatus = input.status ?? existing.status;
     const priority = input.priority ?? existing.priority;
-    assertStatus(status);
+    assertStatus(requestedStatus);
     assertPriority(priority);
+
+    const shouldReturnToInProgress = existing.status === "PR_REVIEW" && requestedStatus === "FAILED";
+    const status: TaskStatus = shouldReturnToInProgress ? "IN_PROGRESS" : requestedStatus;
     assertStatusTransition(existing.status, status);
+
+    const normalizedFailedComment =
+      input.reviewFailedComment !== undefined
+        ? normalizeOptionalText(input.reviewFailedComment)
+        : existing.reviewFailedComment;
+
+    const nextTag = shouldReturnToInProgress
+      ? nextReviewFailedTag(existing.tag)
+      : input.status === "DONE"
+        ? null
+        : existing.tag;
+
+    const reviewFailedAt = shouldReturnToInProgress
+      ? nowIso()
+      : input.reviewFailedComment !== undefined
+        ? normalizedFailedComment
+          ? nowIso()
+          : null
+        : existing.reviewFailedAt;
 
     const updatedTask: Task = {
       ...existing,
@@ -779,16 +826,9 @@ export async function updateTask(taskId: string, input: UpdateTaskInput) {
       project: input.project?.trim() ?? existing.project,
       status,
       priority,
-      reviewFailedComment:
-        input.reviewFailedComment !== undefined
-          ? normalizeOptionalText(input.reviewFailedComment)
-          : existing.reviewFailedComment,
-      reviewFailedAt:
-        input.reviewFailedComment !== undefined
-          ? normalizeOptionalText(input.reviewFailedComment)
-            ? nowIso()
-            : null
-          : existing.reviewFailedAt,
+      tag: nextTag,
+      reviewFailedComment: normalizedFailedComment,
+      reviewFailedAt: reviewFailedAt,
       updatedAt: nowIso(),
     };
 
@@ -953,11 +993,19 @@ export async function reviewPullRequest(prId: string, input: ReviewPullRequestIn
       .eq("id", prId);
     if (reviewError) throw new Error(reviewError.message);
 
-    const taskStatus: TaskStatus = decisionStatus === "APPROVED" ? "DONE" : "FAILED";
+    const { data: taskBeforeReview, error: taskBeforeReviewError } = await supabase
+      .from("mission_control_tasks")
+      .select("id,tag")
+      .eq("id", pr.task_id)
+      .maybeSingle();
+    if (taskBeforeReviewError) throw new Error(taskBeforeReviewError.message);
+
+    const taskStatus: TaskStatus = decisionStatus === "APPROVED" ? "DONE" : "IN_PROGRESS";
     const { error: taskError } = await supabase
       .from("mission_control_tasks")
       .update({
         status: taskStatus,
+        tag: decisionStatus === "REJECTED" ? nextReviewFailedTag(taskBeforeReview?.tag ?? null) : null,
         review_failed_comment: decisionStatus === "REJECTED" ? reason : null,
         review_failed_at: decisionStatus === "REJECTED" ? nowIso() : null,
         updated_at: nowIso(),
@@ -988,12 +1036,13 @@ export async function reviewPullRequest(prId: string, input: ReviewPullRequestIn
     const updatedPRs = [...pullRequests];
     updatedPRs[prIndex] = nextPR;
 
-    const nextTaskStatus: TaskStatus = decisionStatus === "APPROVED" ? "DONE" : "FAILED";
+    const nextTaskStatus: TaskStatus = decisionStatus === "APPROVED" ? "DONE" : "IN_PROGRESS";
     const nextTasks = state.tasks.map((task) =>
       task.id === current.taskId
         ? {
             ...task,
             status: nextTaskStatus,
+            tag: decisionStatus === "REJECTED" ? nextReviewFailedTag(task.tag) : null,
             reviewFailedComment: decisionStatus === "REJECTED" ? reason : null,
             reviewFailedAt: decisionStatus === "REJECTED" ? nowIso() : null,
             updatedAt: nowIso(),
@@ -1026,6 +1075,7 @@ const seedState: MissionControlState = {
       project: "Mission Control",
       status: "IN_PROGRESS",
       priority: "HIGH",
+      tag: null,
       reviewFailedComment: null,
       reviewFailedAt: null,
       createdAt: "2026-03-20T03:00:00.000Z",
@@ -1043,6 +1093,7 @@ const seedState: MissionControlState = {
       project: "Mission Control",
       status: "TODO",
       priority: "MEDIUM",
+      tag: null,
       reviewFailedComment: null,
       reviewFailedAt: null,
       createdAt: "2026-03-20T03:11:00.000Z",

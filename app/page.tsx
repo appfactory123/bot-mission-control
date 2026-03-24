@@ -760,6 +760,7 @@ export default function HomePage() {
                 <span className="pill">{selectedTaskDetail.status}</span>
                 <span className="pill">{selectedTaskDetail.assignee}</span>
                 <span className="pill">{selectedTaskDetail.project}</span>
+                {selectedTaskDetail.tag ? <span className="pill pill--tag">{selectedTaskDetail.tag}</span> : null}
               </div>
 
               <section className="stack">
@@ -875,7 +876,10 @@ function TasksView({
                     }
                   }}>
                     <div className="task-card__topline">
-                      <span className={`priority priority--${task.priority.toLowerCase()}`}>{task.priority}</span>
+                      <div className="pill-row">
+                        <span className={`priority priority--${task.priority.toLowerCase()}`}>{task.priority}</span>
+                        {task.tag ? <span className="pill pill--tag">{task.tag}</span> : null}
+                      </div>
                       <span>{task.id}</span>
                     </div>
                     <h4>{task.title}</h4>

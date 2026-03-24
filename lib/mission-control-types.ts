@@ -17,6 +17,7 @@ export type Task = {
   project: string;
   status: TaskStatus;
   priority: TaskPriority;
+  tag: string | null;
   reviewFailedComment: string | null;
   reviewFailedAt: string | null;
   updatedAt: string;
