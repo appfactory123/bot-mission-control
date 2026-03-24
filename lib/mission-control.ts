@@ -336,7 +336,7 @@ function assertStatusTransition(current: TaskStatus, next: TaskStatus) {
   if (current === next) return;
 
   const allowed: Record<TaskStatus, TaskStatus[]> = {
-    TODO: ["IN_PROGRESS"],
+    BACKLOG: ["IN_PROGRESS"],
     IN_PROGRESS: ["PR_REVIEW"],
     PR_REVIEW: ["DONE", "FAILED"],
     DONE: [],
@@ -404,11 +404,12 @@ function createSupabaseActivityInsert(input: CreateActivityInput) {
 
 function normalizeStatus(value: string): TaskStatus {
   const mapped: Record<string, TaskStatus> = {
-    Backlog: "TODO",
+    Backlog: "BACKLOG",
+    TODO: "BACKLOG",
     "In Progress": "IN_PROGRESS",
     Review: "PR_REVIEW",
     Done: "DONE",
-    Recurring: "TODO",
+    Recurring: "BACKLOG",
     Failed: "FAILED",
   };
   const candidate = (mapped[value] ?? value) as TaskStatus;
@@ -541,7 +542,7 @@ export async function getMissionControlState() {
 
 export async function createTask(input: CreateTaskInput) {
   if (isSupabaseConfigured()) {
-    const status = input.status ?? "TODO";
+    const status = input.status ?? "BACKLOG";
     const priority = input.priority ?? "MEDIUM";
     assertStatus(status);
     assertPriority(priority);
@@ -597,7 +598,7 @@ export async function createTask(input: CreateTaskInput) {
 
   return withWriteLock(async () => {
     const state = await readState();
-    const status = input.status ?? "TODO";
+    const status = input.status ?? "BACKLOG";
     const priority = input.priority ?? "MEDIUM";
     assertStatus(status);
     assertPriority(priority);
@@ -1066,7 +1067,7 @@ const seedState: MissionControlState = {
     {
       id: "T-01",
       title: "Implement strict task lifecycle",
-      description: "Enforce TODO > IN_PROGRESS > PR_REVIEW > DONE/FAILED with validation.",
+      description: "Enforce BACKLOG > IN_PROGRESS > PR_REVIEW > DONE/FAILED with validation.",
       acceptanceCriteria: [
         "Invalid status transitions are rejected",
         "Only Developer/QA assignee is accepted",
@@ -1091,7 +1092,7 @@ const seedState: MissionControlState = {
       ],
       assignee: "QA",
       project: "Mission Control",
-      status: "TODO",
+      status: "BACKLOG",
       priority: "MEDIUM",
       tag: null,
       reviewFailedComment: null,

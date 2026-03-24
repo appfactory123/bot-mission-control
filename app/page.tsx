@@ -203,7 +203,7 @@ export default function HomePage() {
     acceptanceCriteria: "",
     assignee: "Developer" as TaskAssignee,
     project: "Mission Control",
-    status: "TODO" as TaskStatus,
+    status: "BACKLOG" as TaskStatus,
     priority: "MEDIUM" as TaskPriority,
   });
   const [memoryData, setMemoryData] = useState<MemoryApiResponse | null>(null);
@@ -328,7 +328,7 @@ export default function HomePage() {
         acceptanceCriteria: "",
         assignee: "Developer",
         project: "Mission Control",
-        status: "TODO",
+        status: "BACKLOG",
         priority: "MEDIUM",
       });
       setActiveView("tasks");
@@ -609,7 +609,7 @@ export default function HomePage() {
                   >
                     {taskColumns.map((status) => (
                       <option key={status} value={status}>
-                        {status}
+                        {formatTaskStatus(status)}
                       </option>
                     ))}
                   </select>
@@ -757,7 +757,7 @@ export default function HomePage() {
             <div className="task-detail">
               <div className="pill-row">
                 <span className={`priority priority--${selectedTaskDetail.priority.toLowerCase()}`}>{selectedTaskDetail.priority}</span>
-                <span className="pill">{selectedTaskDetail.status}</span>
+                <span className="pill">{formatTaskStatus(selectedTaskDetail.status)}</span>
                 <span className="pill">{selectedTaskDetail.assignee}</span>
                 <span className="pill">{selectedTaskDetail.project}</span>
                 {selectedTaskDetail.tag ? <span className="pill pill--tag">{selectedTaskDetail.tag}</span> : null}
@@ -863,7 +863,7 @@ function TasksView({
           {taskColumns.map((column) => (
             <div key={column} className="kanban__column">
               <div className="kanban__title">
-                <span>{column}</span>
+                <span>{formatTaskStatus(column)}</span>
                 <span>{taskState.tasks.filter((task) => task.status === column).length}</span>
               </div>
               {taskState.tasks
@@ -986,6 +986,18 @@ function TasksView({
       </section>
     </div>
   );
+}
+
+function formatTaskStatus(status: TaskStatus) {
+  const labels: Record<TaskStatus, string> = {
+    BACKLOG: "Backlog",
+    IN_PROGRESS: "In Progress",
+    PR_REVIEW: "In Review",
+    DONE: "Done",
+    FAILED: "Failed",
+  };
+
+  return labels[status] ?? status;
 }
 
 function shortenDescription(markdown: string, maxLength = 160) {

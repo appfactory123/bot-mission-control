@@ -1,4 +1,4 @@
-export const taskStatuses = ["TODO", "IN_PROGRESS", "PR_REVIEW", "DONE", "FAILED"] as const;
+export const taskStatuses = ["BACKLOG", "IN_PROGRESS", "PR_REVIEW", "DONE", "FAILED"] as const;
 export const taskPriorities = ["LOW", "MEDIUM", "HIGH"] as const;
 export const taskAssignees = ["Developer", "QA"] as const;
 export const activityTones = ["active", "complete", "watch"] as const;
